@@ -57,9 +57,10 @@ object PubmedLDA {
   case class Config(command: String = "",
                     in_file: File = new File("."),
                     out_file: File = new File("."),
-                    model_file: File = new File("."))
+                    model_file: File = new File("."),
+                    topics: Int = 100)
 
-  def train(in_file:File, out_file:File) {
+  def train(in_file:File, out_file:File, topics: Int) {
     val tok_pattern = Pattern.compile("[a-z]+")
     val pipes = new SerialPipes((Array(new CharSequence2TokenSequence(tok_pattern),
                                        new TokenSequence2FeatureSequence())))
@@ -69,7 +70,7 @@ object PubmedLDA {
     val inst_list = new InstanceList(pipes)
     inst_list.addThruPipe(lit)
 
-    val model = new ParallelTopicModel(100, 50, 0.01)
+    val model = new ParallelTopicModel(topics, 50, 0.01)
     model.addInstances(inst_list)
     model.setTopicDisplay(50, 10)
     model.setNumIterations(5000)
@@ -85,7 +86,7 @@ object PubmedLDA {
 
   }
 
-  def estimate(in_file:File, out_file:File, model_file:File) {
+  def estimate(in_file:File, out_file:File, model_file:File, topics: Int) {
     val model = ParallelTopicModel.read(model_file)
     val inferencer = model.getInferencer()
 
@@ -98,7 +99,7 @@ object PubmedLDA {
     val inst_list = new InstanceList(pipes)
     inst_list.addThruPipe(lit)
 
-    inferencer.writeInferredDistributions(inst_list, out_file, 500, 200, 200, 0, 20)
+    inferencer.writeInferredDistributions(inst_list, out_file, 500, 200, 200, 0, topics)
   }
 
   def main(args:Array[String]) {
@@ -110,7 +111,9 @@ object PubmedLDA {
         arg[File]("in_file") action { (x, c) =>
           c.copy(in_file = x) } text("a tab separated input file."),
         arg[File]("out_file") action { (x, c) =>
-          c.copy(out_file = x) } text("file name for model output")
+          c.copy(out_file = x) } text("file name for model output"),
+        opt[Int]('t', "topics") action { (x, c) =>
+          c.copy(topics = x) } text("number of topics")
       )
       cmd("estimate") action {(_, c) =>
         c.copy(command = "estimate") } text ("estimate topics.") children(
@@ -119,7 +122,9 @@ object PubmedLDA {
         arg[File]("model_file") action {(x, c) =>
           c.copy(model_file = x) } text("mallet lda model file"),
         arg[File]("out_file") action {(x, c) =>
-          c.copy(out_file = x) } text("file name for estimated vectors")
+          c.copy(out_file = x) } text("file name for estimated vectors"),
+        opt[Int]('t', "topics") action { (x, c) =>
+          c.copy(topics = x) } text("number of topics")
       )
     }
 
@@ -127,10 +132,12 @@ object PubmedLDA {
       case Some(config) => {
         config.command match {
           case "train" => train(config.in_file,
-                                config.out_file)
+                                config.out_file,
+                                config.topics)
           case "estimate" => estimate(config.in_file,
                                       config.out_file,
-                                      config.model_file)
+                                      config.model_file,
+                                      config.topics)
           case _ =>
         }
       }
